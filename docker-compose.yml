@@ -1,0 +1,28 @@
+version: '3'
+services:
+  node0:
+    build: .
+    environment:
+      - FLASK_ENV=development
+      - HOST=node0
+      - PORT=5000
+    ports:
+     - "5000:5000"
+  node1:
+    build: .
+    environment:
+      - PARENT=node0:5000
+      - FLASK_ENV=development
+      - HOST=node1
+      - PORT=5000
+    ports:
+     - "5001:5000"
+  node2:
+    build: .
+    environment:
+      - PARENT=node1:5000
+      - FLASK_ENV=development
+      - HOST=node2
+      - PORT=5000
+    ports:
+     - "5002:5000"
