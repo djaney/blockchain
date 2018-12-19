@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 import blockchain
+from broadcast import Broadcast
 import os
 import urllib.request
 import urllib.error
@@ -10,25 +11,30 @@ PARENT = os.environ.get("PARENT")
 HOST = os.environ.get("HOST")
 PORT = os.environ.get("PORT")
 
-app = Flask(__name__)
+flask_app = Flask(__name__)
+
+
+class BlockBroadcast(Broadcast):
+
+    def receive(self):
+        data = request.data
+        data_dict = json.loads(data)
+        new_block = blockchain.dict_to_block(data_dict)
+        self.node.receive_new_block(new_block)
+        return '', 201
 
 
 class WebNode(blockchain.Node):
     all_nodes = []
 
+    def __init__(self, app, chain=None):
+        super().__init__(chain=chain)
+
+        self.block_broadcaster = BlockBroadcast('blx', app, self)
+
     def broadcast_new_block(self, new_block):
-        for n in self.all_nodes:
-            try:
-                req = urllib.request.Request("http://{}/blx".format(n))
-                req.add_header('Content-Type', 'application/json; charset=utf-8')
-
-                json_bytes = json.dumps(new_block.to_dict()).encode('utf-8')
-                req.add_header('Content-Length', len(json_bytes))
-                urllib.request.urlopen(req, json_bytes)
-            except urllib.error.URLError:
-                # remove host if it timed out
-                self.all_nodes.remove(n)
-
+        json_bytes = json.dumps(new_block.to_dict()).encode('utf-8')
+        self.block_broadcaster.send(json_bytes)
 
     def broadcast_new_transaction(self, transaction):
         pass  # TODO
@@ -40,7 +46,7 @@ class WebNode(blockchain.Node):
 
 if PARENT is None:
     # create genesis
-    node = WebNode()
+    web_node = WebNode(flask_app)
 else:
     while True:
         # always retry
@@ -53,50 +59,42 @@ else:
     contents_dict = json.loads(contents)
 
     # convert dict list to block list
-    chain = [blockchain.dict_to_block(b) for b in contents_dict["chain"]]
-
     # create new node instance with chain
-    node = WebNode(chain)
+    web_node = WebNode(flask_app, chain=[blockchain.dict_to_block(b) for b in contents_dict["chain"]])
     # add parent as peer
-    node.add_peer(PARENT)
+    web_node.add_peer(PARENT)
 
     # add parent peers as own
     for p in contents_dict["nodes"]:
-        node.add_peer(p)
+        web_node.add_peer(p)
 
-@app.route('/', methods=['GET'])
+
+@flask_app.route('/', methods=['GET'])
 def index():
-    return jsonify([c.to_dict() for c in node.chain])
+    return jsonify([c.to_dict() for c in web_node.chain])
 
-@app.route('/connect/<host>/<port>', methods=['GET'])
+
+@flask_app.route('/connect/<host>/<port>', methods=['GET'])
 def connect(host, port):
-    chain = [c.to_dict() for c in node.chain]
-    response = jsonify({"chain": chain, "nodes": node.all_nodes})
-    node.add_peer("{}:{}".format(host, port))
+    chain = [c.to_dict() for c in web_node.chain]
+    response = jsonify({"chain": chain, "nodes": web_node.all_nodes})
+    web_node.add_peer("{}:{}".format(host, port))
 
     return response
 
-@app.route('/peer', methods=['GET'])
+
+@flask_app.route('/peer', methods=['GET'])
 def peer():
-    return jsonify(node.all_nodes)
+    return jsonify(web_node.all_nodes)
 
 
-@app.route('/trx', methods=['GET'])
+@flask_app.route('/trx', methods=['GET'])
 def trx():
-    node.add_transaction({"data": "test"})
+    web_node.add_transaction({"data": "test"})
     return '', 201
 
 
-@app.route('/mine', methods=['GET'])
+@flask_app.route('/mine', methods=['GET'])
 def mine():
-    node.mine()
-    return '', 201
-
-
-@app.route('/blx', methods=['POST'])
-def blx():
-    data = request.data
-    data_dict = json.loads(data)
-    new_block = blockchain.dict_to_block(data_dict)
-    node.receive_new_block(new_block)
+    web_node.mine()
     return '', 201
