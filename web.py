@@ -37,7 +37,7 @@ class WebNode(blockchain.Node):
         self.block_broadcaster.send(json_bytes)
 
     def broadcast_new_transaction(self, transaction):
-        pass  # TODO
+        pass  # TODO broadcast transaction without duplication before doing this
 
     def add_peer(self, peer_host_port):
         if peer_host_port not in self.all_nodes:

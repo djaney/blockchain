@@ -57,6 +57,7 @@ class TestNode(blockchain.Node):
 
     def broadcast_new_transaction(self, transaction):
         pass
+        # TODO able to boradcast transactions without duplication
         # for n in self.all_nodes:
         #     if n is not self:
         #         n.receive_new_transaction(transaction)
