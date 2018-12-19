@@ -51,7 +51,6 @@ def create_block(last_block, data, proof_of_work=None):
 
 
 def verify_chain(chain):
-    # TODO verify if transactions
     last_block_hash = None
     for block in reversed(chain):
         if last_block_hash is not None:

@@ -146,4 +146,16 @@ def is_new_block_valid(chain, new_block):
     if not validate_proof_of_work(chain[-1], new_block):
         return False
 
+    # older transactions cannot be on top
+    last_transaction = None
+    for block in chain:
+        if block.data is not None:
+            for t in block.data:
+                if last_transaction is None:
+                    last_transaction = t
+                else:
+                    if t["time"] < last_transaction["time"]:
+                        return False
+
+
     return True
