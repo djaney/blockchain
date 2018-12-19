@@ -24,6 +24,15 @@ class BlockBroadcast(Broadcast):
         return '', 201
 
 
+class TransactionBroadcast(Broadcast):
+
+    def receive(self):
+        data = request.data
+        transaction = json.loads(data)
+        self.node.add_transaction(transaction)
+        return '', 201
+
+
 class WebNode(blockchain.Node):
     all_nodes = []
 
@@ -31,13 +40,15 @@ class WebNode(blockchain.Node):
         super().__init__(chain=chain)
 
         self.block_broadcaster = BlockBroadcast('blx', app, self)
+        self.transaction_broadcaster = TransactionBroadcast('trn', app, self)
 
     def broadcast_new_block(self, new_block):
         json_bytes = json.dumps(new_block.to_dict()).encode('utf-8')
         self.block_broadcaster.send(json_bytes)
 
     def broadcast_new_transaction(self, transaction):
-        pass  # TODO broadcast transaction without duplication before doing this
+        json_bytes = json.dumps(transaction).encode('utf-8')
+        self.transaction_broadcaster.send(json_bytes)
 
     def add_peer(self, peer_host_port):
         if peer_host_port not in self.all_nodes:
@@ -86,6 +97,11 @@ def connect(host, port):
 @flask_app.route('/peer', methods=['GET'])
 def peer():
     return jsonify(web_node.all_nodes)
+
+
+@flask_app.route('/transactions', methods=['GET'])
+def transactions():
+    return jsonify(web_node.transactions)
 
 
 @flask_app.route('/trx', methods=['GET'])

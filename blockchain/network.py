@@ -18,10 +18,14 @@ class Node:
         self.transactions = []
 
     def add_transaction(self, trans):
-        with self.trans_lock:
-            add_transaction_meta(trans)
-            self.transactions.append(trans)
-        self.broadcast_new_transaction(trans)
+
+        if trans not in self.transactions:
+
+            with self.trans_lock:
+                add_transaction_meta(trans)
+                self.transactions.append(trans)
+
+            self.broadcast_new_transaction(trans)
 
     def mine(self):
 
@@ -110,8 +114,10 @@ class Node:
 
 
 def add_transaction_meta(trans):
-    trans["time"] = time.time()
-    trans["id"] = str(uuid.uuid1())
+    if "time" not in trans:
+        trans["time"] = time.time()
+    if "id" not in trans:
+        trans["id"] = str(uuid.uuid1())
     return trans
 
 
