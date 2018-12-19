@@ -2,7 +2,9 @@ from flask import Flask, jsonify, request
 import blockchain
 import os
 import urllib.request
+import urllib.error
 import json
+import time
 
 PARENT = os.environ.get("PARENT")
 HOST = os.environ.get("HOST")
@@ -16,12 +18,17 @@ class WebNode(blockchain.Node):
 
     def broadcast_new_block(self, new_block):
         for n in self.all_nodes:
-            req = urllib.request.Request("http://{}/blx".format(n))
-            req.add_header('Content-Type', 'application/json; charset=utf-8')
+            try:
+                req = urllib.request.Request("http://{}/blx".format(n))
+                req.add_header('Content-Type', 'application/json; charset=utf-8')
 
-            json_bytes = json.dumps(new_block.to_dict()).encode('utf-8')
-            req.add_header('Content-Length', len(json_bytes))
-            urllib.request.urlopen(req, json_bytes)
+                json_bytes = json.dumps(new_block.to_dict()).encode('utf-8')
+                req.add_header('Content-Length', len(json_bytes))
+                urllib.request.urlopen(req, json_bytes)
+            except urllib.error.URLError:
+                # remove host if it timed out
+                self.all_nodes.remove(n)
+
 
     def broadcast_new_transaction(self, transaction):
         pass  # TODO
@@ -40,12 +47,22 @@ else:
         try:
             contents = urllib.request.urlopen("http://{}/connect/{}/{}".format(PARENT, HOST, PORT)).read()
             break
-        except Exception:
-            pass
+        except urllib.error.URLError:
+            time.sleep(1)
 
-    node = WebNode(blockchain.chain_from_json(contents))
+    contents_dict = json.loads(contents)
+
+    # convert dict list to block list
+    chain = [blockchain.dict_to_block(b) for b in contents_dict["chain"]]
+
+    # create new node instance with chain
+    node = WebNode(chain)
+    # add parent as peer
     node.add_peer(PARENT)
 
+    # add parent peers as own
+    for p in contents_dict["nodes"]:
+        node.add_peer(p)
 
 @app.route('/', methods=['GET'])
 def index():
@@ -53,8 +70,11 @@ def index():
 
 @app.route('/connect/<host>/<port>', methods=['GET'])
 def connect(host, port):
+    chain = [c.to_dict() for c in node.chain]
+    response = jsonify({"chain": chain, "nodes": node.all_nodes})
     node.add_peer("{}:{}".format(host, port))
-    return jsonify([c.to_dict() for c in node.chain])
+
+    return response
 
 @app.route('/peer', methods=['GET'])
 def peer():
