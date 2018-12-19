@@ -52,6 +52,10 @@ class Node:
         # sort transactions
         transactions.sort(key=lambda i: i["time"])
 
+        # do not continue if there are no transactions
+        if len(transactions) == 0:
+            return
+
         # create new block
         new_block = create_block(self.chain[-1], transactions, proof_of_work=answer)
 

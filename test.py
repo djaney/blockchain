@@ -56,11 +56,9 @@ class TestNode(blockchain.Node):
                 n.receive_new_block(new_block)
 
     def broadcast_new_transaction(self, transaction):
-        pass
-        # TODO able to boradcast transactions without duplication
-        # for n in self.all_nodes:
-        #     if n is not self:
-        #         n.receive_new_transaction(transaction)
+        for n in self.all_nodes:
+            if n is not self:
+                n.receive_new_transaction(transaction)
 
 
 class NetworkTest(unittest.TestCase):
@@ -87,7 +85,8 @@ class NetworkTest(unittest.TestCase):
             n.mine()
 
         # after mining all the transaction should be added
-        self.assertEqual(3, len(nodes[0].chain))
+        self.assertEqual(2, len(nodes[0].chain))
+        self.assertEqual(2, len(nodes[0].chain[1].data))
 
         # after mining the transactions should be empty
         for n in nodes:
@@ -103,8 +102,9 @@ class NetworkTest(unittest.TestCase):
 
         # verify transaction data
         for n in nodes:
+            self.assertEqual(None, n.chain[0].data)
             self.assertEqual("transaction#1", n.chain[1].data[0]['data'])
-            self.assertEqual("transaction#2", n.chain[2].data[0]['data'])
+            self.assertEqual("transaction#2", n.chain[1].data[1]['data'])
 
     def test_forks(self):
         node1 = TestNode()
